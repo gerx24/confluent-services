@@ -1,0 +1,63 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: confluent
+  name: msk-ingress
+  annotations:
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:311543950481:certificate/0c7671d9-2b79-48f0-a281-35ce5f5a1e00
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+    alb.ingress.kubernetes.io/group.name: msk
+    alb.ingress.kubernetes.io/tags: Environment=dbdev,Name=dbdev-usva-pincer-project-ops-core,Application=msk,Maintainer=cloud-platform-eng@estee.com,Team=cloud-platform-eng,Project=pincer-project,Region=usva
+    external-dns/provider: all-eks
+    external-dns.alpha.kubernetes.io/hostname: connect.usva.dbdev.web.elco.cloud,rest-proxy.usva.dbdev.web.elco.cloud,schema-registry.usva.dbdev.web.elco.cloud,ksqldb.usva.dbdev.web.elco.cloud
+    alb.ingress.kubernetes.io/inbound-cidrs: 172.29.23.0/24,152.231.128.228/32
+spec:
+  ingressClassName: alb
+  rules:
+    - host: connect.usva.dbdev.web.elco.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: connect-svc
+                port:
+                  number: 8083
+    - host: rest-proxy.usva.dbdev.web.elco.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rest-proxy-svc
+                port:
+                  number: 8082
+    - host: schema-registry.usva.dbdev.web.elco.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: schema-registry-svc
+                port:
+                  number: 8081
+    - host: ksqldb.usva.dbdev.web.elco.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ksqldb-svc
+                port:
+                  number: 8088

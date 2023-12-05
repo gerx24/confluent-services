@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.restproxy.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.restproxy.name }}
+    {{- include "confluent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.restproxy.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.restproxy.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.restproxy.name }}
+    spec:
+      containers:
+        - name: cp-restproxy
+          image: {{ .Values.restproxy.image }}
+          imagePullPolicy: {{ .Values.restproxy.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.restproxy.service.port }}
+          env:
+            - name: KAFKA_REST_CLIENT_CLIENT_ID
+              value: {{ .Values.restproxy.kafkarestclientid }}
+            - name: KAFKA_REST_ID
+              value: {{ .Values.restproxy.kafkarestID }}
+            - name: KAFKA_REST_BOOTSTRAP_SERVERS
+              value: {{ .Values.restproxy.mskbootstrapservers }}
+            - name: KAFKA_REST_CLIENT_SECURITY_PROTOCOL
+              value: "SASL_SSL"
+            - name: KAFKA_REST_CLIENT_SASL_MECHANISM
+              value: "SCRAM-SHA-512"
+            - name: KAFKA_REST_LISTENERS
+              value: http://0.0.0.0:8082
+            - name: KAFKA_REST_ACCESS_CONTROL_ALLOW_METHODS
+              value: GET,POST,PUT
+            - name: KAFKA_REST_LOG4J_LOGGERS
+              value: "org.apache.kafka=ERROR,io.confluent.kafka.rest=INFO"
+            - name: KAFKA_REST_SCHEMA_REGISTRY_URL
+              value: {{ .Values.restproxy.schemaregistryurl }}
+            - name: KAFKA_REST_DEBUG
+              value: "false"
+            - name: REST_PROXY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.restproxy.secretname }}
+                  key: username
+            - name: REST_PROXY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.restproxy.secretname }}
+                  key: password
+            - name: KAFKA_REST_CLIENT_SASL_JAAS_CONFIG
+              value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(REST_PROXY_USERNAME)\" password=\"$(REST_PROXY_PASSWORD)\";"
+          resources:
+            requests:
+              cpu: {{ .Values.restproxy.resources.requests.cpu }}
+              memory: {{ .Values.restproxy.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.restproxy.resources.limits.cpu }}
+              memory: {{ .Values.restproxy.resources.limits.memory }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.restproxy.service.name }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+    external-dns/provider: all-eks
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.restproxy.hostname }}
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/"
+  namespace: confluent
+  labels:
+    app: {{ .Values.restproxy.name }}
+spec:
+  selector:
+    app: {{ .Values.restproxy.name }}
+  ports:
+  - port: {{ .Values.restproxy.service.port }}
+    targetPort: {{ .Values.restproxy.service.targetPort }}
+  type: LoadBalancer

@@ -1,0 +1,97 @@
+name: Bump the chart version
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment name."
+        required: true
+        type: choice
+        options:
+          - dbdev
+      version:
+        description: "Chart version(git tag) to deploy. If not set, the latest tag will be used."
+        required: false
+        type: string
+        default: ""
+      tenant:
+        description: "Tenant name confluent"
+        required: false
+        type: string
+        default: "confluent"
+
+
+jobs:
+  bump:
+    name: Set the version for ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PLATFORM_ENG_PAT }}
+
+      - name: Get the latest version from tags
+        id: get_version
+        if: ${{ inputs.version == '' }}
+        run: |-
+          echo version=$(git describe --tags --abbrev=0) | tee -a $GITHUB_OUTPUT
+
+      - name: Test if the provided version/tag exists
+        if: ${{ inputs.version != '' }}
+        run: |-
+          if ! git rev-parse -q --verify "refs/tags/${{ inputs.version }}" > /dev/null; then
+              echo "Tag ${{ inputs.version }} does not exist."
+              exit 1
+          fi
+
+      - name: Get the chart name
+        run: |-
+          # inputs.version and steps.get_version.outputs.version are mutually exclusive, only one of them will be set
+          jq '. + {"${{ inputs.environment }}": "${{ inputs.version }}${{ steps.get_version.outputs.version }}"}' versions.json > temp.json
+          mv temp.json versions.json
+
+      - name: Commit changes
+        run: |-
+          set -eo pipefail
+
+          git config --global user.email "drupal-mysql-snapshots@estee.com"
+          git config --global user.name "${{ github.repository }}(${{ github.actor }})"
+
+          git add versions.json
+          if git diff-index --quiet HEAD; then
+            echo "#########################################################"
+            echo "#                                                       #"
+            echo "#             Nothing to commit apparently              #"
+            echo "#                                                       #"
+            echo "#########################################################"
+            exit 0
+          fi
+          git commit -m "set base version for ${{ inputs.environment }} to ${{ inputs.version }}${{ steps.get_version.outputs.version }}"
+
+          GIT_PUSH_ATTEMPTS_TOTAL=5
+          GIT_PUSH_ATTEMPTS=0
+          until git push origin main || [ "$GIT_PUSH_ATTEMPTS" -ge $GIT_PUSH_ATTEMPTS_TOTAL ]; do
+            GIT_PUSH_ATTEMPTS=$((GIT_PUSH_ATTEMPTS+1))
+            sleep $GIT_PUSH_ATTEMPTS
+            git pull --rebase --ff-only origin main || (git fetch origin main && git merge origin/main --no-edit)
+          done
+
+          if [[ "$GIT_PUSH_ATTEMPTS" -eq $GIT_PUSH_ATTEMPTS_TOTAL ]]; then
+            echo "Unable to push to k8s-apps repository"
+            exit 1
+          fi
+
+
+      - name: Trigger the deployment
+        env:
+          GH_TOKEN: ${{ secrets.PLATFORM_ENG_PAT }}
+        run: |-
+          gh workflow run deploy-tenant.yml \
+            --repo elc-online/k8s-apps \
+            --field environment=${{ inputs.environment }} \
+            --field tenant=${{ inputs.tenant }} \
+            --field chartRepository=elc-online/confluent-helm \
+            --field chartLocation=chart \
+            --field publishToECR=true

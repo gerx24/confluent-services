@@ -1,0 +1,19 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: connect-ingressroute
+  namespace: confluent
+  annotations:
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`connect.usva.dbdev.web.elco.cloud`)
+      services:
+        - kind: Service
+          name: connect-svc
+          namespace: confluent
+          passHostHeader: true
+          port: 8083

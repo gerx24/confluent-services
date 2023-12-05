@@ -1,0 +1,106 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connect
+  namespace: confluent
+  labels:
+    app: connect
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: connect
+  template:
+    metadata:
+      labels:
+        app: connect
+    spec:
+      containers:
+      - name: connect
+        image: confluentinc/cp-server-connect:7.5.0
+        ports:
+        - containerPort: 8083
+        env:
+        - name: CONNECT_CLIENT_ID
+          value: "kafka-connect-dbdev"
+        - name: CONNECT_GROUP_ID
+          value: "kafka-connect-group"
+        - name: CONNECT_BOOTSTRAP_SERVERS
+          value: b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096
+        - name: CONNECT_KEY_CONVERTER
+          value: "org.apache.kafka.connect.json.JsonConverter"
+        - name: CONNECT_VALUE_CONVERTER
+          value: "org.apache.kafka.connect.json.JsonConverter"
+        - name: CONNECT_INTERNAL_KEY_CONVERTER
+          value: "org.apache.kafka.connect.json.JsonConverter"
+        - name: CONNECT_INTERNAL_VALUE_CONVERTER
+          value: "org.apache.kafka.connect.json.JsonConverter"
+        - name: CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE
+          value: "false"
+        - name: CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE
+          value: "false"
+        - name: CONNECT_INTERNAL_KEY_CONVERTER_SCHEMAS_ENABLE
+          value: "false"
+        - name: CONNECT_INTERNAL_VALUE_CONVERTER_SCHEMAS_ENABLE
+          value: "false"
+        - name: CONNECT_CONFIG_STORAGE_TOPIC
+          value: "connect-config"
+        - name: CONNECT_OFFSET_STORAGE_TOPIC
+          value: "connect-offsets"
+        - name: CONNECT_STATUS_STORAGE_TOPIC
+          value: "connect-status"
+        - name: CONNECT_CONFIG_STORAGE_PARTITIONS
+          value: "1"
+        - name: CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR
+          value: "3"
+        - name: CONNECT_OFFSET_STORAGE_PARTITIONS
+          value: "1"
+        - name: CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR
+          value: "3"
+        - name: CONNECT_STATUS_STORAGE_PARTITIONS
+          value: "1"
+        - name: CONNECT_STATUS_STORAGE_REPLICATION_FACTOR
+          value: "3"
+        - name: CONNECT_LOG4J_LOGGERS
+          value: "io.confluent.connect=INFO,org.reflections=ERROR,org.eclipse.jetty=ERROR"
+        - name: CONNECT_LOG4J_ROOT_LOG
+          value: "INFO"
+        - name: CONNECT_PLUGIN_PATH
+          value: "/usr/share/java,/usr/local/share/kafka/plugins/"
+        - name: CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL
+          value: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+        - name: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
+          value: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+        - name: CONNECT_REST_ADVERTISED_HOST_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: CONNECT_SECURITY_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: msk-connect-dbdev
+              key: username
+        - name: CONNECT_SECURITY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: msk-connect-dbdev
+              key: password
+        - name: CONNECT_SECURITY_PROTOCOL
+          value: "SASL_SSL"
+        - name: CONNECT_SASL_MECHANISM
+          value: "SCRAM-SHA-512"
+        - name: CONNECT_SASL_JAAS_CONFIG
+          value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(CONNECT_SECURITY_USERNAME)\" password=\"$(CONNECT_SECURITY_PASSWORD)\";"
+        - name: CONNECT_PRODUCER_SECURITY_PROTOCOL
+          value: "SASL_SSL"
+        - name: CONNECT_PRODUCER_SASL_MECHANISM
+          value: "SCRAM-SHA-512"
+        - name: CONNECT_PRODUCER_SASL_JAAS_CONFIG
+          value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(CONNECT_SECURITY_USERNAME)\" password=\"$(CONNECT_SECURITY_PASSWORD)\";"
+        - name: CONNECT_CONSUMER_SECURITY_PROTOCOL
+          value: "SASL_SSL"
+        - name: CONNECT_CONSUMER_SASL_MECHANISM
+          value: "SCRAM-SHA-512"
+        - name: CONNECT_CONSUMER_SASL_JAAS_CONFIG
+          value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(CONNECT_SECURITY_USERNAME)\" password=\"$(CONNECT_SECURITY_PASSWORD)\";"

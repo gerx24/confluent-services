@@ -1,0 +1,122 @@
+environment: dbdev
+
+namespace: confluent
+
+connect:
+  name: cp-connect
+  replicas: 1
+  image: confluentinc/cp-server-connect:7.5.0
+  imagePullPolicy: IfNotPresent
+  service:
+   name: connect-svc
+   type: LoadBalancer
+   port: 443
+   targetPort: 8083
+  mskbootstrapservers: b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096
+  schemaregistryurl: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+  secretkey: AmazonMSK_/msk_kafkaconnect_dbdev
+  secretname: msk-connect-dbdev
+  connectclientid: "kafka-connect-dbdev"
+  connectgroupid: "kafka-connect-group"
+  hostname: connect.usva.dbdev.web.elco.cloud
+  serviceAccount:
+    name: confluent-connect-sa
+    role: arn:aws:iam::311543950481:role/msk-confluent-dbdev-usva-pincer-project-irsa
+  snapshot:
+    name: cp-connect-volume-snapshot
+    persistentVolumeClaim:
+      name: cp-connect-jar-pvc
+      storage: 100Gi
+    storageClassName:
+      name: gp3-storage-delete
+    volumeSnapshotContent:
+      name: cp-connect-snap-content
+    volumeSnapshotContentName:
+      reference: cp-connect-snap-content
+    volumeSnapshotClassName:
+      name: volume-snapshot-class-ebs-retain
+  snapshotID: snap-097c31f8ee90e9b99
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1024Mi
+    limits:
+      cpu: 500m
+      memory: 2048Mi
+
+schemaregistry:
+  name: cp-schemaregistry
+  replicas: 1
+  image: confluentinc/cp-schema-registry:7.5.0
+  imagePullPolicy: IfNotPresent
+  service:
+   name: schema-registry-svc
+   type: LoadBalancer
+   port: 443
+   targetPort: 8081
+  mskbootstrapservers: "b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096"
+  secretkey: AmazonMSK_/msk_schemaregistry_dbdev
+  secretname: msk-schemaregistry-dbdev
+  schemaregistrykafakastoreclientid: "schema-registry-client-dbdev"
+  schemaregistrykafakastoregroupid: "schema-registry-group"
+  schemaregistrykafkatopic: "_schemas"
+  hostname: schema-registry.usva.dbdev.web.elco.cloud
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1024Mi
+    limits:
+      cpu: 500m
+      memory: 2048Mi
+
+
+restproxy:
+  name: cp-restproxy
+  replicas: 1
+  image: confluentinc/cp-kafka-rest:7.5.0
+  imagePullPolicy: IfNotPresent
+  service:
+   name: rest-proxy-svc
+   type: LoadBalancer
+   port: 443
+   targetPort: 8082
+  mskbootstrapservers: b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096
+  schemaregistryurl: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+  secretkey: AmazonMSK_/msk_restproxy_dbdev
+  secretname: msk-restproxy-dbdev
+  kafkarestclientid: "kafka-restproxy-dbdev-admin-client"
+  kafkarestid: "kafka-restproxy-dbdev"
+  hostname: rest-proxy.usva.dbdev.web.elco.cloud
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1024Mi
+    limits:
+      cpu: 500m
+      memory: 2048Mi
+
+ksqldb:
+  name: cp-ksqldb
+  replicas: 1
+  image: confluentinc/cp-ksqldb-server:7.5.0
+  imagePullPolicy: IfNotPresent
+  service:
+   name: ksqldb-svc
+   type: LoadBalancer
+   port: 443
+   targetPort: 8088
+  mskbootstrapservers: "b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096"
+  schemaregistryurl: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+  ksqlconnecturl: "http://connect-svc.confluent.svc.cluster.local:8083"
+  secretkey: AmazonMSK_/msk_ksqldb_dbdev
+  secretname: msk-ksqldb-dbdev
+  ksqlserviceid: "ksqldb-server-dbdev"
+  ksqlclientid: "ksqldb-dvdev"
+  hostname: ksqldb.usva.dbdev.web.elco.cloud
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1024Mi
+    limits:
+      cpu: 500m
+      memory: 2048Mi

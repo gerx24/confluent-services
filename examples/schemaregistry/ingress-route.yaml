@@ -1,0 +1,20 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: schema-registry-ingressroute
+  namespace: confluent
+  annotations:
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`schema-registry.usva.dbdev.web.elco.cloud`)
+      services:
+        - kind: Service
+          name: schema-registry-svc
+          namespace: confluent
+          passHostHeader: true
+          port: 8081
+          scheme: http

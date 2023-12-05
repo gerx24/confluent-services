@@ -1,0 +1,67 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: {{ .Values.namespace }}
+  name: {{ .Values.ingress.name }}
+  labels:
+    app: {{ .Values.ksqldb.name }}
+    {{- include "confluent.labels" . | nindent 4 }}
+  annotations:
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/scheme: {{ .Values.ingress.scheme }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.certificate }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+    alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.group.name }}
+    alb.ingress.kubernetes.io/tags: {{ .Values.ingress.tags }}
+    external-dns/provider: all-eks
+    external-dns.alpha.kubernetes.io/hostname: |
+     {{ .Values.connect.hostname }},{{ .Values.restproxy.hostname }},{{ .Values.schemaregistry.hostname }},{{ .Values.ksqldb.hostname }}
+    alb.ingress.kubernetes.io/inbound-cidrs: {{ .Values.ingress.whitelist }}
+spec:
+  ingressClassName: alb
+  rules:
+    - host: {{ .Values.connect.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.connect.service.name }}
+                port:
+                  number: {{ .Values.connect.service.port }}
+    - host: {{ .Values.restproxy.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.restproxy.service.name }}
+                port:
+                  number: {{ .Values.restproxy.service.port }}
+    - host: {{ .Values.schemaregistry.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.schemaregistry.service.name }}
+                port:
+                  number: {{ .Values.schemaregistry.service.port }}
+    - host: {{ .Values.ksqldb.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.ksqldb.service.name }}
+                port:
+                  number: {{ .Values.ksqldb.service.port }}

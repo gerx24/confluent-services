@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: connect-svc
+  namespace: confluent
+  labels:
+    app: connect
+spec:
+  selector:
+    app: connect
+  ports:
+  - port: 8083
+  type: ClusterIP

@@ -1,0 +1,153 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.connect.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.connect.name }}
+    {{- include "confluent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.connect.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.connect.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.connect.name }}
+    spec:
+      containers:
+        - name: cp-connect
+          image: {{ .Values.connect.image }}
+          imagePullPolicy: {{ .Values.connect.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.connect.service.port }}
+          env:
+            - name: CONNECT_CLIENT_ID
+              value: {{ .Values.connect.connectclientid }}
+            - name: CONNECT_GROUP_ID
+              value: {{ .Values.connect.connectgroupid }}
+            - name: CONNECT_BOOTSTRAP_SERVERS
+              value: {{ .Values.connect.mskbootstrapservers }}
+            - name: CONNECT_KEY_CONVERTER
+              value: "io.confluent.connect.avro.AvroConverter"
+            - name: CONNECT_VALUE_CONVERTER
+              value: "io.confluent.connect.avro.AvroConverter"
+            - name: CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE
+              value: "false"
+            - name: CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE
+              value: "false"
+            - name: CONNECT_CONFIG_STORAGE_TOPIC
+              value: "connect-config"
+            - name: CONNECT_OFFSET_STORAGE_TOPIC
+              value: "connect-offsets"
+            - name: CONNECT_STATUS_STORAGE_TOPIC
+              value: "connect-status"
+            - name: CONNECT_CONFIG_STORAGE_PARTITIONS
+              value: "1"
+            - name: CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR
+              value: "3"
+            - name: CONNECT_OFFSET_STORAGE_PARTITIONS
+              value: "1"
+            - name: CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR
+              value: "3"
+            - name: CONNECT_STATUS_STORAGE_PARTITIONS
+              value: "1"
+            - name: CONNECT_STATUS_STORAGE_REPLICATION_FACTOR
+              value: "3"
+            - name: CONNECT_LOG4J_LOGGERS
+              value: "io.confluent.connect=INFO,org.reflections=ERROR,org.eclipse.jetty=ERROR"
+            - name: CONNECT_LOG4J_ROOT_LOG
+              value: "INFO"
+            - name: CONNECT_PLUGIN_PATH
+              value: "/usr/share/java,/usr/local/share/kafka/plugins,/usr/share/custom-plugins/kafka-connect-oracle-avro-tojsonstring"
+            - name: CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL
+              value: {{ .Values.connect.schemaregistryurl }}
+            - name: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
+              value: {{ .Values.connect.schemaregistryurl }}
+            - name: CONNECT_REST_ADVERTISED_HOST_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: CONNECT_SECURITY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.connect.secretname }}
+                  key: username
+            - name: CONNECT_SECURITY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.connect.secretname }}
+                  key: password
+            - name: CONNECT_SECURITY_PROTOCOL
+              value: "SASL_SSL"
+            - name: CONNECT_SASL_MECHANISM
+              value: "SCRAM-SHA-512"
+            - name: CONNECT_SASL_JAAS_CONFIG
+              value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(CONNECT_SECURITY_USERNAME)\" password=\"$(CONNECT_SECURITY_PASSWORD)\";"
+            - name: CONNECT_PRODUCER_SECURITY_PROTOCOL
+              value: "SASL_SSL"
+            - name: CONNECT_PRODUCER_SASL_MECHANISM
+              value: "SCRAM-SHA-512"
+            - name: CONNECT_PRODUCER_SASL_JAAS_CONFIG
+              value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(CONNECT_SECURITY_USERNAME)\" password=\"$(CONNECT_SECURITY_PASSWORD)\";"
+            - name: CONNECT_CONSUMER_SECURITY_PROTOCOL
+              value: "SASL_SSL"
+            - name: CONNECT_CONSUMER_SASL_MECHANISM
+              value: "SCRAM-SHA-512"
+            - name: CONNECT_CONSUMER_SASL_JAAS_CONFIG
+              value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(CONNECT_SECURITY_USERNAME)\" password=\"$(CONNECT_SECURITY_PASSWORD)\";"
+          resources:
+            requests:
+              cpu: {{ .Values.connect.resources.requests.cpu }}
+              memory: {{ .Values.connect.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.connect.resources.limits.cpu }}
+              memory: {{ .Values.connect.resources.limits.memory }}
+          volumeMounts:
+            - mountPath: /usr/share/custom-plugins
+              name: msk-kafka-connect-svc-dbdev-jar
+      volumes:
+        - name: msk-kafka-connect-svc-dbdev-jar
+          persistentVolumeClaim:
+            claimName: {{ .Values.connect.snapshot.persistentVolumeClaim.name }}
+      serviceAccountName: {{ .Values.connect.serviceAccount.name }}
+
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.connect.service.name }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+    external-dns/provider: all-eks
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.connect.hostname }}
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-east-1:311543950481:certificate/0c7671d9-2b79-48f0-a281-35ce5f5a1e00
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: TCP
+  namespace: confluent
+  labels:
+    app: {{ .Values.connect.name }}
+spec:
+  selector:
+    app: {{ .Values.connect.name }}
+  ports:
+  - port: {{ .Values.connect.service.port }}
+    targetPort: {{ .Values.connect.service.targetPort }}
+  type: LoadBalancer

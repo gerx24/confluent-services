@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.schemaregistry.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.schemaregistry.name }}
+    {{- include "confluent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.schemaregistry.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.schemaregistry.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.schemaregistry.name }}
+    spec:
+      containers:
+        - name: cp-schemaregistry
+          image: {{ .Values.schemaregistry.image }}
+          imagePullPolicy: {{ .Values.schemaregistry.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.schemaregistry.service.port }}
+          env:
+            - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+              value: {{ .Values.schemaregistry.mskbootstrapservers }}
+            - name: SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL
+              value: "SASL_SSL"
+            - name: SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM
+              value: "SCRAM-SHA-512"
+            - name: SCHEMA_REGISTRY_HOST_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SCHEMA_REGISTRY_KAFKASTORE_CLIENT_ID
+              value: {{ .Values.schemaregistry.schemaregistrykafakastoreclientid }}
+            - name: SCHEMA_REGISTRY_KAFKASTORE_GROUP_ID
+              value: {{ .Values.schemaregistry.schemaregistrykafakastoregroupid }}
+            - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC
+              value: {{ .Values.schemaregistry.schemaregistrykafkatopic }}
+            - name: SCHEMA_REGISTRY_LOG4J_LOGGERS
+              value: "org.apache.kafka=ERROR,io.confluent.kafka.schemaregistry=INFO"
+            - name: SCHEMA_REGISTRY_DEBUG
+              value: "false"
+            - name: SCHEMA_REGISTRY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.schemaregistry.secretname }}
+                  key: username
+            - name: SCHEMA_REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.schemaregistry.secretname }}
+                  key: password
+            - name: SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG
+              value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(SCHEMA_REGISTRY_USERNAME)\" password=\"$(SCHEMA_REGISTRY_PASSWORD)\";"
+          resources:
+            requests:
+              cpu: {{ .Values.schemaregistry.resources.requests.cpu }}
+              memory: {{ .Values.schemaregistry.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.schemaregistry.resources.limits.cpu }}
+              memory: {{ .Values.schemaregistry.resources.limits.memory }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.schemaregistry.service.name }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+    external-dns/provider: all-eks
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.schemaregistry.hostname }}
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/"
+  namespace: confluent
+  labels:
+    app: {{ .Values.schemaregistry.name }}
+spec:
+  selector:
+    app: {{ .Values.schemaregistry.name }}
+  ports:
+  - port: {{ .Values.schemaregistry.service.port }}
+    targetPort: {{ .Values.schemaregistry.service.targetPort }}
+  type: LoadBalancer

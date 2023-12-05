@@ -1,0 +1,130 @@
+name: Publish the chart
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "chart/**"
+      - "!chart/Chart.yaml"
+
+concurrency:
+  group: main
+
+jobs:
+  release:
+    name: Tag the release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PLATFORM_ENG_PAT }}
+
+      - name: Bump version
+        id: version
+        uses: paulhatch/semantic-version@v5.0.3
+        with:
+          major_pattern: "/^major:/"
+          minor_pattern: "/^minor:/"
+
+      - name: Bump chart version
+        working-directory: chart
+        run: |-
+          yq -i '.version = "${{ steps.version.outputs.version_tag }}"' Chart.yaml
+
+          git config --global user.email "confluent-platform@estee.com"
+          git config --global user.name "${{ github.repository }}(${{ github.actor }})"
+
+          git add Chart.yaml
+          git commit -m "bump chart version to ${{ steps.version.outputs.version_tag }}"
+
+      - name: Tag and push to remote
+        run: |-
+          generated_tag="${{ steps.version.outputs.version_tag }}"
+          if git tag --points-at HEAD | grep -w "${generated_tag}"; then
+            echo "Tag already exists"
+          else
+            git tag ${generated_tag}
+            git push origin main
+            git push origin ${generated_tag}
+          fi
+
+  publish:
+    name: Publish Helm chart to ECR ${{ matrix.account }}
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      HELM_EXPERIMENTAL_OCI: "1"
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: chart
+    strategy:
+      fail-fast: false
+      matrix:
+        account: [dbdev]
+        include:
+          - account: dbdev
+            aws-region: us-east-1
+            aws-role: arn:aws:iam::311543950481:role/ecr-gha-writer-confluent20231127160812609600000001
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: main
+
+      - uses: azure/setup-helm@v3
+        with:
+          version: latest
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure AWS credentials
+        id: aws-creds
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ matrix.aws-region }}
+          role-to-assume: ${{ matrix.aws-role }}
+
+      - name: Login to ECR
+        run: |-
+          aws ecr get-login-password \
+            --region ${{ matrix.aws-region }} | helm registry login \
+            --username AWS \
+            --password-stdin ${{ steps.aws-creds.outputs.aws-account-id }}.dkr.ecr.${{ matrix.aws-region }}.amazonaws.com
+
+      - name: Publish chart
+        run: |-
+          chart=$(yq '.name' Chart.yaml)
+          helm dependency update .
+          helm package .
+          helm push ${chart}-${{ needs.release.outputs.version }}.tgz oci://${{ steps.aws-creds.outputs.aws-account-id }}.dkr.ecr.${{ matrix.aws-region }}.amazonaws.com
+
+  pr-comment:
+    name: Comment on PR
+    needs: [release, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      issues: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Comment on PR
+        uses: elc-online/github-actions-elc/.github/actions/pr-comment@pr-comment-action
+        with:
+          mergeCommitSha: ${{ github.sha }}
+          replaceRegex: "^Publish to ECR"
+          message: |-
+            Publish to ECR: ${{ needs.publish.result }}
+            Version: ${{ needs.release.outputs.version }}
+            [ GH Action ](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})

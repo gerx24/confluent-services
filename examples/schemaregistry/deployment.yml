@@ -1,0 +1,56 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schema-registry
+  namespace: confluent
+  labels:
+    app: schema-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: schema-registry
+  template:
+    metadata:
+      labels:
+        app: schema-registry
+    spec:
+      containers:
+      - name: schemaregistry
+        image: confluentinc/cp-schema-registry:7.5.0
+        ports:
+        - containerPort: 8081
+        env:
+        - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+          value: b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096
+        - name: SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL
+          value: SASL_SSL
+        - name: SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM
+          value: SCRAM-SHA-512
+        - name: SCHEMA_REGISTRY_HOST_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: SCHEMA_REGISTRY_KAFKASTORE_CLIENT_ID
+          value: schema-registry-client-dbdev
+        - name: SCHEMA_REGISTRY_KAFKASTORE_GROUP_ID
+          value: schema-registry-group
+        - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC
+          value: _schemas
+        - name: SCHEMA_REGISTRY_LOG4J_LOGGERS
+          value: "org.apache.kafka=ERROR,io.confluent.kafka.schemaregistry=INFO"
+        - name: SCHEMA_REGISTRY_DEBUG
+          value: "false"
+        - name: SCHEMA_REGISTRY_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: msk-schemaregistry-dbdev
+              key: username
+        - name: SCHEMA_REGISTRY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: msk-schemaregistry-dbdev
+              key: password
+        - name: SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG
+          value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(SCHEMA_REGISTRY_USERNAME)\" password=\"$(SCHEMA_REGISTRY_PASSWORD)\";"

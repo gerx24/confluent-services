@@ -1,0 +1,13 @@
+
+KAFKA_REST_CLIENT_CLIENT_ID: "kafka-restproxy-dbdev-admin-client"
+KAFKA_REST_ID: "kafka-restproxy-dbdev"
+KAFKA_REST_BOOTSTRAP_SERVERS: "b-3.mskperlgemprovisioned.zqlqs9.c20.kafka.us-east-1.amazonaws.com:9098,b-4.mskperlgemprovisioned.zqlqs9.c20.kafka.us-east-1.amazonaws.com:9098,b-1.mskperlgemprovisioned.zqlqs9.c20.kafka.us-east-1.amazonaws.com:9098"
+KAFKA_REST_CLIENT_SECURITY_PROTOCOL: "SASL_SSL"
+KAFKA_REST_CLIENT_SASL_MECHANISM: "SCRAM-SHA-512"
+KAFKA_REST_CLIENT_SASL_JAAS_CONFIG: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"alice\" password=\"alice-secret\";"
+KAFKA_REST_HOST_NAME: 18.208.230.110
+KAFKA_REST_LISTENERS: http://0.0.0.0:8082
+KAFKA_REST_ACCESS_CONTROL_ALLOW_METHODS: GET,POST,PUT
+KAFKA_REST_LOG4J_LOGGERS: "org.apache.kafka=ERROR,io.confluent.kafka.rest=INFO"
+KAFKA_REST_SCHEMA_REGISTRY_URL: ""
+KAFKA_REST_DEBUG: "false"

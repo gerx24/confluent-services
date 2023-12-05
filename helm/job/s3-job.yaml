@@ -1,0 +1,64 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cp-connect-jar-pvc
+  # annotations:
+  #   argocd.argoproj.io/hook: PostSync
+  #   argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  namespace: confluent
+  # labels:
+  #   app: {{ .Values.connect.name }}
+  #   {{- include "confluent.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3-storage-delete
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: confluent
+  name: cp-connect-job
+  # annotations:
+  #   argocd.argoproj.io/hook: PostSync
+  #   argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  # labels:
+  #   app: {{ .Values.connect.name }}
+  #   {{- include "confluent.labels" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: copy-jar-files-to-pvc
+        image: amazon/aws-cli
+        command: ["/bin/sh", "-c"]
+        args:
+        - "aws s3 cp s3://msk-kafka-connect-svc-dbdev-jar/ /jars --recursive"
+        volumeMounts:
+          - mountPath: /jars
+            name: msk-kafka-connect-svc-dbdev-jar
+      volumes:
+        - name: msk-kafka-connect-svc-dbdev-jar
+          persistentVolumeClaim:
+            claimName: cp-connect-jar-pvc
+      containers:
+      - name: snapshot-from-pvc
+        imagePullPolicy: IfNotPresent
+        image: amazon/aws-cli
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            export PVC_NAME=cp-connect-jar-pvc
+            echo Persistante volume claim to be used $PVC_NAME
+            export VOLUME_ID=$(aws ec2 describe-volumes --filter "Name=tag:kubernetes.io/created-for/pvc/name,Values=$PVC_NAME" --query 'Volumes[*].VolumeId' --output text)
+            echo Volume being used to create Snapshot $VOLUME_ID
+            export SNAPSHOT_ID=$(aws ec2 create-snapshot --volume-id $VOLUME_ID --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Environment,Value=dbdev},{Key=Application,Value=msk-confluent},{Key=owner,Value=Platform-Engineering},{Key=Name,Value=msk-kafka-connect-snapshot}]' --query 'SnapshotId' --output text)
+            echo snapshot $SNAPSHOT_ID sucessfully created.
+      serviceAccount: confluent-connect-sa
+      restartPolicy: Never
+  backoffLimit: 2

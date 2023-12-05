@@ -1,0 +1,107 @@
+name: Test the chart
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - chart/**
+
+jobs:
+  prepare:
+    name: Prepare the chart information
+    runs-on: ubuntu-latest
+    outputs:
+      chart: ${{ steps.prepare.outputs.chart_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get chart name
+        id: prepare
+        working-directory: chart
+        run: |-
+          echo "chart_name=$(yq '.name' Chart.yaml)" | tee -a $GITHUB_OUTPUT
+
+  check-ecr-registry:
+    name: Check if ${{ matrix.account }} ECR repository exists
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        account: [dbdev]
+        include:
+          - account: dbdev
+            aws-region: us-east-1
+            aws-role: arn:aws:iam::311543950481:role/ecr-gha-writer-confluent20231127160812609600000001
+    outputs:
+      dbdev_repo_status: ${{ steps.check-ecr-repo.outputs.dbdev_repo_status }}
+    steps:
+      - name: Configure AWS credentials
+        id: aws-creds
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ matrix.aws-region }}
+          role-to-assume: ${{ matrix.aws-role }}
+
+      - name: Determine if ECR repository exists
+        id: check-ecr-repo
+        run: |-
+          if aws ecr describe-repositories --repository ${{ needs.prepare.outputs.chart }}; then
+            repo_status="👌 OK"
+          else
+            repo_status="⚠️ Not found"
+          fi
+          echo "${{ matrix.account }}_repo_status=${repo_status}" | tee -a $GITHUB_OUTPUT
+
+  test-chart:
+    name: Test if chart is rendering properly
+    needs: [prepare, check-ecr-registry]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      issues: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - uses: azure/setup-helm@v3
+        with:
+          version: latest
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Render the chart
+        id: render
+        working-directory: chart
+        run: |-
+          set -eo pipefail
+          namespace=confluent
+          release=confluent-platform-dbdev
+
+          helm dependency update
+          # test
+          find . -type f -name "values-*.yaml" -print | \
+            xargs -I ARG helm template -n $namespace $release . --debug --dry-run --values ARG | tee -a render.yaml
+
+      - name: Comment results
+        if: always()
+        uses: elc-online/github-actions-elc/.github/actions/pr-comment@pr-comment-action
+        with:
+          replaceRegex: "^#### Helm template render"
+          message: |-
+            #### Helm template render 🤖\`${{ steps.render.outcome }}\`
+            <details><summary>Details</summary>
+
+            \`\`\`YAML
+            $(cat chart/render.yaml)
+            \`\`\`
+
+            </details>
+
+            Dbdev ECR registry: ${{ needs.check-ecr-registry.outputs.dbdev_repo_status }}

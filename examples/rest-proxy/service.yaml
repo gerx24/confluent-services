@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rest-proxy-svc
+  namespace: confluent
+  labels:
+    app: rest-proxy
+spec:
+  selector:
+    app: rest-proxy
+  ports:
+  - port: 8082
+  type: ClusterIP

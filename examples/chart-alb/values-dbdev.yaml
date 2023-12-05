@@ -1,0 +1,112 @@
+environment: dbdev
+
+namespace: confluent
+
+ingress:
+  name: cp-msk-ingress
+  certificate: arn:aws:acm:us-east-1:311543950481:certificate/0c7671d9-2b79-48f0-a281-35ce5f5a1e00
+  tags: Environment=dbdev,Name=dbdev-usva-pincer-project-ops-core,Application=cp-msk,Maintainer=cloud-platform-eng@estee.com,Team=cloud-platform-eng,Project=pincer-project,Region=usva
+  whitelist: 172.29.23.0/24,152.231.128.228/32
+  scheme: internet-facing
+  group:
+    name: cp-msk
+
+connect:
+  name: cp-connect
+  replicas: 1
+  image: confluentinc/cp-server-connect:7.5.0
+  imagePullPolicy: IfNotPresent
+  serviceAccount:
+   create: true
+  service:
+   name: connect-svc
+   type: ClusterIP
+   port: 8083
+  mskbootstrapservers: b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096
+  schemaregistryurl: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+  secretkey: AmazonMSK_/msk_kafkaconnect_dbdev
+  secretname: msk-connect-dbdev
+  connectclientid: "kafka-connect-dbdev"
+  connectgroupid: "kafka-connect-group"
+  hostname: connect.usva.dbdev.web.elco.cloud
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1024Mi
+    limits:
+      cpu: 500m
+      memory: 2048Mi
+
+schemaregistry:
+  name: cp-schemaregistry
+  replicas: 1
+  image: confluentinc/cp-schema-registry:7.5.0
+  imagePullPolicy: IfNotPresent
+  service:
+   name: schema-registry-svc
+   type: ClusterIP
+   port: 8081
+  mskbootstrapservers: "b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096"
+  secretkey: AmazonMSK_/msk_schemaregistry_dbdev
+  secretname: msk-schemaregistry-dbdev
+  schemaregistrykafakastoreclientid: "schema-registry-client-dbdev"
+  schemaregistrykafakastoregroupid: "schema-registry-group"
+  schemaregistrykafkatopic: "_schemas"
+  hostname: schema-registry.usva.dbdev.web.elco.cloud
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1024Mi
+    limits:
+      cpu: 500m
+      memory: 2048Mi
+
+
+restproxy:
+  name: cp-restproxy
+  replicas: 1
+  image: confluentinc/cp-kafka-rest:7.5.0
+  imagePullPolicy: IfNotPresent
+  service:
+   name: rest-proxy-svc
+   type: ClusterIP
+   port: 8082
+  mskbootstrapservers: b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096
+  schemaregistryurl: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+  secretkey: AmazonMSK_/msk_restproxy_dbdev
+  secretname: msk-restproxy-dbdev
+  kafkarestclientid: "kafka-restproxy-dbdev-admin-client"
+  kafkarestid: "kafka-restproxy-dbdev"
+  hostname: rest-proxy.usva.dbdev.web.elco.cloud
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1024Mi
+    limits:
+      cpu: 500m
+      memory: 2048Mi
+
+ksqldb:
+  name: cp-ksqldb
+  replicas: 1
+  image: confluentinc/cp-ksqldb-server:7.5.0
+  imagePullPolicy: IfNotPresent
+  service:
+   name: ksqldb-svc
+   type: ClusterIP
+   port: 8088
+  mskbootstrapservers: "b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096"
+  schemaregistryurl: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+  ksqlconnecturl: "http://connect-svc.confluent.svc.cluster.local:8083"
+  secretkey: AmazonMSK_/msk_ksqldb_dbdev
+  secretname: msk-ksqldb-dbdev
+  ksqlserviceid: "ksqldb-server-dbdev"
+  ksqlclientid: "ksqldb-dvdev"
+  hostname: ksqldb.usva.dbdev.web.elco.cloud
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1024Mi
+    limits:
+      cpu: 500m
+      memory: 2048Mi

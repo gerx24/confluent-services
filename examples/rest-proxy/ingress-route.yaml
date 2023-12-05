@@ -1,0 +1,21 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: rest-proxy-ingressroute
+  namespace: confluent
+  annotations:
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`rest-proxy.usva.dbdev.web.elco.cloud`)
+      services:
+        - kind: Service
+          name: rest-proxy-svc
+          namespace: confluent
+          passHostHeader: true
+          port: 8082
+          scheme: http
+

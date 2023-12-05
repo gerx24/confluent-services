@@ -1,0 +1,56 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rest-proxy
+  namespace: confluent
+  labels:
+    app: rest-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rest-proxy
+  template:
+    metadata:
+      labels:
+        app: rest-proxy
+    spec:
+      containers:
+      - name: rest-proxy
+        image: confluentinc/cp-kafka-rest:7.5.0
+        ports:
+        - containerPort: 8082
+        env:
+        - name: KAFKA_REST_CLIENT_CLIENT_ID
+          value: "kafka-restproxy-dbdev-admin-client"
+        - name: KAFKA_REST_ID
+          value: "kafka-restproxy-dbdev"
+        - name: KAFKA_REST_BOOTSTRAP_SERVERS
+          value: b-2.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-1.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096,b-3.bifrostusvadbdevmskkaf.7929xq.c3.kafka.us-east-1.amazonaws.com:9096
+        - name: KAFKA_REST_CLIENT_SECURITY_PROTOCOL
+          value: "SASL_SSL"
+        - name: KAFKA_REST_CLIENT_SASL_MECHANISM
+          value: "SCRAM-SHA-512"
+        - name: KAFKA_REST_LISTENERS
+          value: http://0.0.0.0:8082
+        - name: KAFKA_REST_ACCESS_CONTROL_ALLOW_METHODS
+          value: GET,POST,PUT
+        - name: KAFKA_REST_LOG4J_LOGGERS
+          value: "org.apache.kafka=ERROR,io.confluent.kafka.rest=INFO"
+        - name: KAFKA_REST_SCHEMA_REGISTRY_URL
+          value: "http://schema-registry-svc.confluent.svc.cluster.local:8081"
+        - name: KAFKA_REST_DEBUG
+          value: "false"
+        - name: REST_PROXY_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: msk-restproxy-dbdev
+              key: username
+        - name: REST_PROXY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: msk-restproxy-dbdev
+              key: password
+        - name: KAFKA_REST_CLIENT_SASL_JAAS_CONFIG
+          value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(REST_PROXY_USERNAME)\" password=\"$(REST_PROXY_PASSWORD)\";"

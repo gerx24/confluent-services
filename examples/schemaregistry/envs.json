@@ -1,0 +1,11 @@
+
+SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "b-3.mskperlgemprovisioned.zqlqs9.c20.kafka.us-east-1.amazonaws.com:9098,b-4.mskperlgemprovisioned.zqlqs9.c20.kafka.us-east-1.amazonaws.com:9098,b-1.mskperlgemprovisioned.zqlqs9.c20.kafka.us-east-1.amazonaws.com:9098"
+SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: "SASL_SSL"
+SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: "SCRAM-SHA-512"
+SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"alice\" password=\"alice-secret\";"
+SCHEMA_REGISTRY_HOST_NAME: 18.208.230.110
+SCHEMA_REGISTRY_KAFKASTORE_CLIENT_ID: "schema-registry-client-dbdev"
+SCHEMA_REGISTRY_KAFKASTORE_GROUP_ID: "schema-registry-group"
+SCHEMA_REGISTRY_KAFKASTORE_TOPIC: "_schemas"
+SCHEMA_REGISTRY_LOG4J_LOGGERS: "org.apache.kafka=ERROR,io.confluent.kafka.schemaregistry=INFO"
+SCHEMA_REGISTRY_DEBUG: "false"

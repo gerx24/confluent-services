@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.ksqldb.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.ksqldb.name }}
+    {{- include "confluent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.ksqldb.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.ksqldb.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.ksqldb.name }}
+    spec:
+      containers:
+        - name: cp-ksqldb
+          image: {{ .Values.ksqldb.image }}
+          imagePullPolicy: {{ .Values.ksqldb.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.ksqldb.service.port }}
+          env:
+            - name: KSQL_KSQL_SERVICE_ID
+              value: {{ .Values.ksqldb.ksqlserviceid }}
+            - name: KSQL_LISTERNERS
+              value: "http://0.0.0.0:8088"
+            - name: KSQL_BOOTSTRAP_SERVERS
+              value: {{ .Values.ksqldb.mskbootstrapservers }}
+            - name: KSQL_SECURITY_PROTOCOL
+              value: "SASL_SSL"
+            - name: KSQL_SASL_MECHANISM
+              value: "SCRAM-SHA-512"
+            - name: KSQL_KSQL_CONNECT_URL
+              value: {{ .Values.ksqldb.ksqlconnecturl }}
+            - name: KSQL_KSQL_SCHEMA_REGISTRY_URL
+              value: {{ .Values.ksqldb.schemaregistryurl }}
+            - name: KSQL_KSQL_FAIL_ON_DESERIALIZATION_ERROR
+              value: "false"
+            - name: KSQL_KSQL_FAIL_ON_PRODUCTION_ERROR
+              value: "false"
+            - name: KSQL_KSQL_INTERNAL_TOPIC_REPLICAS
+              value: "-1"
+            - name: KSQL_KSQL_STREAMS_REPLICATION_FACTOR
+              value: "-1"
+            - name: KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION_FACTOR
+              value: "-1"
+            - name: KSQL_HEARTBEAT_ENABLE
+              value: "true"
+            - name: KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE
+              value: "true"
+            - name: KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE
+              value: "true"
+            - name: KSQL_KSQL_SINK_REPLICAS
+              value: "3"
+            - name: KSQL_CLASSPATH
+              value: "/usr/share/java/*:/usr/share/java/ksqldb-server/*"
+            - name: KSQL_KSQL_EXTENSION_DIR
+              value: "/opt/ksqldb-udfs"
+            - name: KSQL_CLIENT_ID
+              value: {{ .Values.ksqldb.ksqlclientid }}
+            - name: KSQL_KSQL_OUTPUT_TOPIC_NAME_PREFIX
+              value: "ksqldb-output-"
+            - name: KSQLDB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ksqldb.secretname }}
+                  key: username
+            - name: KSQLDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ksqldb.secretname }}
+                  key: password
+            - name: KSQL_SASL_JAAS_CONFIG
+              value: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$(KSQLDB_USERNAME)\" password=\"$(KSQLDB_PASSWORD)\";"
+          resources:
+            requests:
+              cpu: {{ .Values.ksqldb.resources.requests.cpu }}
+              memory: {{ .Values.ksqldb.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.ksqldb.resources.limits.cpu }}
+              memory: {{ .Values.ksqldb.resources.limits.memory }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.ksqldb.service.name }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+    external-dns/provider: all-eks
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.ksqldb.hostname }}
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/info"
+  namespace: confluent
+  labels:
+    app: {{ .Values.ksqldb.name }}
+spec:
+  selector:
+    app: {{ .Values.ksqldb.name }}
+  ports:
+  - port: {{ .Values.connect.service.port }}
+    targetPort: {{ .Values.ksqldb.service.targetPort }}
+  type: LoadBalancer
